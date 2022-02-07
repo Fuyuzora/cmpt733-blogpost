@@ -1,5 +1,6 @@
-import numpy as np
+
 from datetime import datetime
+import os.path
 
 import torch
 import torch.nn as nn
@@ -8,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from torchvision import datasets, transforms
 
-from CNNClasses import LeNet, AlexNet, VGGNet
+from CNNClasses import LeNet, AlexNet, VGGNet, ResNet
 
 import pickle
 
@@ -17,6 +18,10 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE = 32
 EPOCHS = 10
 N_CLASSES = 10
+run_lenet = False
+run_alexnet =False
+run_vggnet = False
+run_resnet = True
 
 
 def train(train_loader, model, criterion, optimizer, device):
@@ -110,8 +115,9 @@ alexnet_train = []
 alexnet_valid = []
 vggnet_train = []
 vggnet_valid = []
+resnet_train = []
+resnet_valid = []
 
-# LeNet ================================================================
 transforms32 = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor()])
 train_dataset = datasets.FashionMNIST(
     root='mnist_data', train=True, transform=transforms32, download=True)
@@ -122,14 +128,16 @@ train_loader = DataLoader(dataset=train_dataset,
 valid_loader = DataLoader(dataset=valid_dataset,
                           batch_size=BATCH_SIZE, shuffle=False)
 
-lenet = LeNet(N_CLASSES).to(DEVICE)
-optimizer = torch.optim.Adam(lenet.parameters())
-criterion = nn.CrossEntropyLoss()
+# LeNet ================================================================
+if run_lenet:
+    lenet = LeNet(N_CLASSES).to(DEVICE)
+    optimizer = torch.optim.Adam(lenet.parameters())
+    criterion = nn.CrossEntropyLoss()
 
-lenet, optimizer, (lenet_train, lenet_valid) = training_loop(
-    lenet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
+    lenet, optimizer, (lenet_train, lenet_valid) = training_loop(
+        lenet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
 
-# AlexNet ================================================================
+# Reshape images for more complex architecture ================================
 transforms224 = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
 train_dataset = datasets.FashionMNIST(
     root='mnist_data', train=True, transform=transforms224, download=True)
@@ -140,20 +148,33 @@ train_loader = DataLoader(dataset=train_dataset,
 valid_loader = DataLoader(dataset=valid_dataset,
                           batch_size=BATCH_SIZE, shuffle=False)
 
-alexnet = AlexNet(N_CLASSES).to(DEVICE)
-optimizer = torch.optim.Adam(alexnet.parameters())
-criterion = nn.CrossEntropyLoss()
+# AlexNet ================================================================\
+if run_alexnet:
+    alexnet = AlexNet(N_CLASSES).to(DEVICE)
+    optimizer = torch.optim.Adam(alexnet.parameters())
+    criterion = nn.CrossEntropyLoss()
 
-alexnet, optimizer, (alexnet_train, alexnet_valid) = training_loop(
-    alexnet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
+    alexnet, optimizer, (alexnet_train, alexnet_valid) = training_loop(
+        alexnet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
 
 # VGGNet ================================================================
-vggnet = VGGNet(N_CLASSES).to(DEVICE)
-optimizer = torch.optim.Adam(vggnet.parameters())
-criterion = nn.CrossEntropyLoss()
+if run_vggnet:
+    vggnet = VGGNet(N_CLASSES).to(DEVICE)
+    optimizer = torch.optim.Adam(vggnet.parameters())
+    criterion = nn.CrossEntropyLoss()
 
-alexnet, optimizer, (vggnet_train, vggnet_valid) = training_loop(
-    vggnet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
+    vggnet, optimizer, (vggnet_train, vggnet_valid) = training_loop(
+        vggnet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
+
+
+# ResNet ================================================================
+if run_resnet:
+    resnet = ResNet(N_CLASSES).to(DEVICE)
+    optimizer = torch.optim.Adam(resnet.parameters())
+    criterion = nn.CrossEntropyLoss()
+
+    resnet, optimizer, (resnet_train, resnet_valid) = training_loop(
+        resnet, criterion, optimizer, train_loader, valid_loader, EPOCHS, DEVICE)
 
 acc_dict = {
     'lenet_train': lenet_train,
@@ -162,10 +183,24 @@ acc_dict = {
     'alexnet_valid': alexnet_valid,
     'vggnet_train': vggnet_train,
     'vggnet_valid': vggnet_valid,
+    'resnet_train': resnet_train,
+    'resnet_valid': resnet_valid,
 }
 
-with open('accuracy.pkl', 'wb') as f:
-    pickle.dump(acc_dict, f)
+if os.path.isfile('accuracy.pkl'):
+    records = {}
+    with open('accuracy.pkl', 'rb') as f:
+        records = pickle.load(f)
+
+    for key, value in acc_dict.items():
+        if key not in records.keys() and len(value) > 0:
+            records[key] = value
+
+    with open('accuracy.pkl', 'wb') as f:
+        pickle.dump(records, f)
+else:
+    with open('accuracy.pkl', 'wb') as f:
+        pickle.dump(acc_dict, f)
 
 print('================= Accuracy Saved ====================')
 print(acc_dict)
@@ -176,3 +211,5 @@ print(alexnet_train)
 print(alexnet_valid)
 print(vggnet_train)
 print(vggnet_valid)
+print(resnet_train)
+print(resnet_valid)
